@@ -37,9 +37,23 @@
 				- [Install Microsoft 365 Apps on a master Virtual Hard Disk image](#install-microsoft-365-apps-on-a-master-virtual-hard-disk-image)
 				- [Windows Language pack installs](#windows-language-pack-installs)
 	- [Storage](#storage)
+		- [Storage solutions for Azure Virtual Desktop](#storage-solutions-for-azure-virtual-desktop)
+		- [Azure Management details](#azure-management-details)
+		- [Azure Files tiers](#azure-files-tiers)
+		- [Profile Container vs Office Container](#profile-container-vs-office-container)
+			- [Using Profile Container and Office Container together](#using-profile-container-and-office-container-together)
 		- [FSLogix profile containers](#fslogix-profile-containers)
-			- [Configure FSLogix profile containers](#configure-fslogix-profile-containers)
 			- [Configure the storage account for FSLogix profiles](#configure-the-storage-account-for-fslogix-profiles)
+			- [Install FSLogix components](#install-fslogix-components)
+				- [Microsoft FSLogix Apps Installation](#microsoft-fslogix-apps-installation)
+				- [Application Masking Rule Editor Installation](#application-masking-rule-editor-installation)
+			- [Configure FSLogix profile containers](#configure-fslogix-profile-containers)
+				- [Before configuring Profile Container](#before-configuring-profile-container)
+				- [Configure Profile Container Registry settings](#configure-profile-container-registry-settings)
+				- [Optional Registry settings](#optional-registry-settings)
+				- [Set up Include and Exclude User Groups](#set-up-include-and-exclude-user-groups)
+		- [Cloud Cache for Profile Container and Office Container](#cloud-cache-for-profile-container-and-office-container)
+		- [Installing Microsoft Office using FSLogix application containers](#installing-microsoft-office-using-fslogix-application-containers)
 		- [Azure Files](#azure-files)
 			- [Supported authentication scenarios](#supported-authentication-scenarios)
 			- [Restrictions](#restrictions)
@@ -48,6 +62,7 @@
 		- [QoS](#qos)
 			- [Quality of Service implementation checklist](#quality-of-service-implementation-checklist)
 	- [Performance](#performance)
+		- [Best practices for Azure Virtual Desktop](#best-practices-for-azure-virtual-desktop)
 		- [Host sizing](#host-sizing)
 		- [Network](#network)
 		- [Performance tooling](#performance-tooling)
@@ -498,6 +513,57 @@ Azure files recommended for most customers. Other options are Azure NetApp files
 
 See https://learn.microsoft.com/en-us/training/modules/design-user-identities-profiles/4-recommend-appropriate-storage-solution
 
+### Storage solutions for Azure Virtual Desktop
+
+| **Features**            | **Azure Files**                                                                                                     | **Azure NetApp Files**                                                | **Storage Spaces Direct**                                                                                                             |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| Use case                | General purpose                                                                                                     | Ultra performance or migration from NetApp on-premises                | Cross-platform                                                                                                                        |
+| Platform service        | Yes, Azure-native solution                                                                                          | Yes, Azure-native solution                                            | No, self-managed                                                                                                                      |
+| Regional availability   | All regions                                                                                                         | Select regions                                                        | All regions                                                                                                                           |
+| Redundancy              | Locally redundant/zone-redundant/geo-redundant/geo-zone-redundant                                                   | Locally redundant                                                     | Locally redundant/zone-redundant/geo-redundant                                                                                        |
+| Tiers and performance   | Standard (Transaction optimized) Premium Up to max 100K IOPS per share with 10 GBps per share at about 3 ms latency | Standard Premium Ultra Up to 4.5GBps per volume at about 1 ms latency | Standard HDD: up to 500 IOPS per-disk limits, Standard SSD: up to 4k IOPS per-disk limits Premium SSD: up to 20k IOPS per-disk limits |
+| Capacity                | 100 TiB per share, Up to 5 PiB per general purpose account                                                          | 100 TiB per volume, up to 12.5 PiB per subscription                   | Maximum 32 TiB per disk                                                                                                               |
+| Required infrastructure | Minimum share size 1 GiB                                                                                            | Minimum capacity pool 4 TiB, min volume size 100 GiB                  | Two VMs on Azure IaaS or at least three VMs without and costs for disks                                                               |
+| Protocols               | SMB 3.0/2.1, NFSv4.1 (preview), REST                                                                                | NFSv3, NFSv4.1 (preview), SMB 3.x/2.x                                 | NFSv3, NFSv4.1, SMB 3.1                                                                                                               |
+
+### Azure Management details
+
+| **Features**                       | **Azure Files**                                                    | **Azure NetApp Files**                                             | **Storage Spaces Direct**                                                      |
+|------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| Access                             | Cloud, on-premises and hybrid (Azure file sync)                    | Cloud, on-premises (via ExpressRoute)                              | Cloud, on-premises                                                             |
+| Backup                             | Azure backup snapshot integration                                  | Azure NetApp Files snapshots                                       | Azure backup snapshot integration                                              |
+| Security and compliance            | All Azure supported certificates                                   | ISO completed                                                      | All Azure supported certificates                                               |
+| Azure Active Directory integration | Native Active Directory and Azure Active Directory Domain Services | Azure Active Directory Domain Services and Native Active Directory | Native Active Directory or Azure Active Directory Domain Services support only |
+
+### Azure Files tiers
+
+| **Workload type**            | **Recommended file tier**                                 |
+|------------------------------|-----------------------------------------------------------|
+| Light (fewer than 200 users) | Standard file shares                                      |
+| Light (more than 200 users)  | Premium file shares or standard with multiple file shares |
+| Medium                       | Premium file shares                                       |
+| Heavy                        | Premium file shares                                       |
+| Power                        | Premium file shares                                       |
+
+### Profile Container vs Office Container
+
+Office Container is a subset of Profile Container. As opposed to Profile Container, Office Container redirects only the local user files for Microsoft Office.
+
+All benefits of Office Container are automatic when using Profile Container. There's no need to implement Office Container if Profile Container is your primary solution for managing profiles. Office Container could optionally be used with Profile Container, to place Office Data in a location separate from the rest of the user's profile.
+
+Some things to know about Office Profile Containers:
+
+- Configuration settings for Profile Container are set in `HKLM\SOFTWARE\Policies\FSLogix\ODFC`.
+- By default Everyone is added to the `FSLogix ODFC Include List` group.
+- Adding a user to the `FSLogix ODFC Exclude` List group means that the FSLogix agent won't attach a FSLogix office container for the user. In the case where a user is a member of both the exclude and include groups, exclude takes priority.
+
+#### Using Profile Container and Office Container together
+There are several reasons why Profile Container and Office Container may be used together. The most common reasons are:
+
+- Discretion is wanted in the storage location for Office Data vs. other profile data.
+- If the Office Container or Profile Container is damaged, the remaining data remains intact. Storage discretion is useful if there is a problem with Office Data, which can be recovered from the server as the Office Container can be deleted without impacting the rest of the user configuration.
+- Office Container may be used with Profile Container as a mechanism to specify which Office components will have their data included in the container.
+
 ### FSLogix profile containers
 
 FSLogix addresses many profile container challenges. Key among them are:
@@ -506,7 +572,52 @@ FSLogix addresses many profile container challenges. Key among them are:
 - **OneDrive:** Without FSLogix profile containers, OneDrive for Business is not supported in non-persistent RDSH or VDI environments.
 - **Additional folders:** FSLogix provides the ability to extend user profiles to include additional folders.
 
+![FSLogix concept](Images/fslogix-concept-a2405e6b.png)
+
 Microsoft has started replacing existing user profile solutions, like UPD, with FSLogix profile containers.
+
+#### Configure the storage account for FSLogix profiles
+
+Two choices for storage account type: 
+
+- **General purpose version 2 (GPv2) storage accounts:** GPv2 storage accounts allow you to deploy Azure file shares on standard/hard disk-based (HDD-based) hardware. GPv2 storage accounts can store other storage resources such as blob containers, queues, or tables. File shares can be deployed into the transaction optimized (default), hot, or cool tiers.
+  - Quota can be set, but you pay only for what you use.
+- **FileStorage storage accounts:** FileStorage storage accounts allow you to deploy Azure file shares on premium/solid-state disk-based (SSD-based) hardware. FileStorage accounts store Azure file shares. Storage resources, such as blob containers or queues, cannot be deployed in a FileStorage account.
+  - Quota is overloaded to mean provisioned size. The provisioned size is the amount that you will be billed. So you need to calculate future growth and required iOPS in advance.
+
+#### Install FSLogix components
+
+The download for  FSLogix includes three installers that are used to install the specific component(s) necessary for your use.
+
+##### Microsoft FSLogix Apps Installation
+
+Microsoft FSLogix Apps installs the core drivers and components for all FSLogix solutions. Any environment using FSLogix must install FSLogix Apps. After installation configure Profile Container before using for profile redirection.
+
+##### Application Masking Rule Editor Installation
+
+Application Masking manages access to Applications, Fonts, and other items based on criteria. The Application Rules Editor is used to Describe the item, such as application, to be managed. The Editor is also used to define criteria rules are managed by.
+
+Things you can do with the Apps Rules Editor:
+
+- Create new Rule Sets.
+- Edit existing Rule Sets.
+- Manage the user and group assignments for Rule Sets.
+- Temporarily test rule-sets.
+
+By default, Rules and Rule Sets are accessed from C:\Program Files\FSLogix\Apps\Rules.
+
+File types:
+- rule files (.fxr) 
+- assignment files (.fxa)
+
+FSlogix supports four rule types:
+
+- **Hiding Rule** - hides the specified items using specified criteria.
+- **Redirect Rule** - causes the specified item to be redirected as defined.
+- **App Container Rule** - redirects the specified content into a VHD.
+- **Specify Value Rule** - assigns a value for the specified item.
+
+The Application Masking Rule Editor is used to define rules used by [Application Masking](https://learn.microsoft.com/en-us/fslogix/implement-application-masking-tutorial).
 
 #### Configure FSLogix profile containers
 
@@ -522,14 +633,67 @@ Microsoft has started replacing existing user profile solutions, like UPD, with 
       - `Enabled` = `1`
       - `VHDLocations` = `<network path to file share>`
 
-#### Configure the storage account for FSLogix profiles
+##### Before configuring Profile Container
 
-Two choices for storage account type: 
+- Download and install FSLogix Software.
+- Consider the storage and network requirements for your users' profiles.
+- Verify that your users have appropriate storage permissions where profiles will be placed.
+- Profile Container is installed and configured after stopping use of other solutions used to manage remote profiles.
+- Exclude the VHD(X) files for Profile Containers from Anti Virus (AV) scanning.
 
-- **General purpose version 2 (GPv2) storage accounts:** GPv2 storage accounts allow you to deploy Azure file shares on standard/hard disk-based (HDD-based) hardware. GPv2 storage accounts can store other storage resources such as blob containers, queues, or tables. File shares can be deployed into the transaction optimized (default), hot, or cool tiers.
-  - Quota can be set, but you pay only for what you use.
-- **FileStorage storage accounts:** FileStorage storage accounts allow you to deploy Azure file shares on premium/solid-state disk-based (SSD-based) hardware. FileStorage accounts store Azure file shares. Storage resources, such as blob containers or queues, cannot be deployed in a FileStorage account.
-  - Quota is overloaded to mean provisioned size. The provisioned size is the amount that you will be billed. So you need to calculate future growth and required iOPS in advance.
+##### Configure Profile Container Registry settings
+The configuration of Profile Container is accomplished through registry settings and user groups. Registry settings may be managed manually, with GPOs, or using alternate preferred methods. Configuration settings for Profile Container are set in HKLM\SOFTWARE\FSLogix\Profiles.
+
+Below are settings required to enable Profile Container and to specify the location for the profile VHD to be stored. The minimum required settings to enable Profile Containers are:
+
+| **Value**                       | **Type**           | **Configured Value** | **Description**                                                                                                                                                                                                                                                                                                  |
+|---------------------------------|--------------------|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Enabled (required setting)      | DWORD              | 1                    | 0: Profile Containers disabled. 1: Profile Containers enabled                                                                                                                                                                                                                                                    |
+| VHDLocations (required setting) | MULTI_SZ or REG_SZ |                      | A list of file system locations to search for the user's profile VHD(X) file. If one isn't found, one will be created in the first listed location. If the VHD path doesn't exist, it will be created before it checks if a VHD(X) exists in the path. These values can contain variables that will be resolved. |
+
+VHDLocations may be replaced by CCDLocations when using Cloud Cache.
+
+##### Optional Registry settings
+
+| **Value**                            | **Type** | **Configured Value** | **Description**                                                                                                                                                                                                                                                                                                                                                 |
+|--------------------------------------|----------|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| DeleteLocalProfileWhenVHDShouldApply | DWORD    | 0                    | 0: no deletion. 1: delete local profile if exists and matches the profile being loaded from VHD. Use caution with this setting. When the FSLogix Profiles system determines a user should have a FSLogix profile, but a local profile exists, Profile Container permanently deletes the local profile. The user will then be signed in with an FSLogix profile. |
+| FlipFlopProfileDirectoryName         | DWORD    | 0                    | When set to '1' the SID folder is created as "%username%%sid%" instead of the default "%sid%%username%". This setting has the same effect as setting SIDDirNamePattern = "%username%%sid%" and SIDDirNameMatch = "%username%%sid%".                                                                                                                             |
+| PreventLoginWithFailure              | DWORD    | 0                    | If set to 1 Profile Container will load FRXShell if there's a failure attaching to, or using an existing profile VHD(X). The user will receive the FRXShell prompt - default prompt to call support, and the users only option will be to sign out.                                                                                                             |
+| PreventLoginWithTempProfile          | DWORD    | 0                    | If set to 1 Profile Container will load FRXShell if it's determined a temp profile has been created. The user will receive the FRXShell prompt - default prompt to call support, and the users only option will be to sign out.                                                                                                                                 |
+
+##### Set up Include and Exclude User Groups
+There are often users, such as local administrators, that have profiles that should remain local. During installation, four user groups are created to manage users who's profiles are included and excluded from Profile Container and Office Container redirection.
+
+- By default Everyone is added to the `FSLogix Profile Include` List group.
+- Adding a user to the `FSLogix Profile Exclude List` group means that the FSLogix agent will not attach a FSLogix profile container for the user. In the case where a user is a member of both the exclude and include groups, exclude takes priority.
+
+### Cloud Cache for Profile Container and Office Container
+
+Cloud Cache is a technology that provides incremental functionality to Profile Container and Office Container.
+
+Cloud Cache uses a Local Profile to service all reads from a redirected Profile or Office Container, after the first read. Cloud Cache also allows the use of multiple remote locations, which are all continually updated during the user session. Using Cloud Cache can insulate users from short-term loss of connectivity to remote profile containers. Cloud Cache can also provide real time, 'active active' redundancy for Profile Container and Office Container.
+
+![Cloud Cache design](Images/cloud-cache-design.png)
+
+It's important to understand that, even with Cloud Cache, all initial reads are accomplished from the redirected location. Likewise, all writes occur to all remote storage locations, although writes go to the Local Cache file first.
+
+Cloud Cache doesn't improve the users' sign-on and sign out experience when using poor performing storage. It's common for environments using Cloud Cache to have slightly slower sign-on and sign out times, relative to using traditional VHDLocations, using the same storage. After initial sign-on, Cloud Cache can improve the user experience for subsequent reads of data from the Profile Container or Office Container, as these reads are serviced from the Local Cache file.
+
+It's possible to move current Profile Container and Office Container implementations to Cloud Cache. To start using Cloud Cache, replace the VHDLocations setting with CCDLocations. CCDLocations and VHDLocations may not be used in the same implementation.
+
+For detailed configuration instructions, refer to [Configure Cloud Cache | Microsoft Learn](https://learn.microsoft.com/en-us/training/modules/implement-manage-fslogix/9-configure-cloud-cache)
+
+### Installing Microsoft Office using FSLogix application containers
+
+You can install Microsoft Office quickly and efficiently by using an FSLogix application container as a template for the other virtual machines (VMs) in your host pool.
+
+Here's why using an FSLogix app container can help make installation faster:
+
+- Offloading your Office apps to an app container reduces the requirements for your C drive size.
+- Snapshots or backups of your VM takes less resources.
+- Having an automated pipeline through updating a single image makes updating your VMs easier.
+- You only need one image to install Office (and other apps) onto all the VMs in your Azure Virtual Desktop deployment.
 
 ### Azure Files
 
@@ -596,6 +760,17 @@ We recommend using DSCP value 46 that maps to Expedited Forwarding (EF) DSCP cla
 
 
 ## Performance
+
+### Best practices for Azure Virtual Desktop
+
+To ensure your Azure Virtual Desktop environment follows best practices:
+
+- Azure Files storage account must be in the same region as the session host VMs.
+- Azure Files permissions should match permissions described in Requirements - Profile Containers.
+- Each host pool VM must be built of the same type and size VM based on the same master image.
+- Each host pool VM must be in the same resource group to aid management, scaling and updating.
+- For optimal performance, the storage solution and the FSLogix profile container should be in the same data center location.
+- The storage account containing the master image must be in the same region and subscription where the VMs are being provisioned.
 
 ### Host sizing
 
