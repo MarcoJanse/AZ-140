@@ -25,6 +25,7 @@
 			- [Prepare virtual machines](#prepare-virtual-machines)
 			- [Register virtual machines to the AVD host pool](#register-virtual-machines-to-the-avd-host-pool)
 		- [Virtual Machine Images](#virtual-machine-images)
+		- [General imaging recommendations](#general-imaging-recommendations)
 			- [Managed images](#managed-images)
 			- [Upload master image to a storage account in Azure](#upload-master-image-to-a-storage-account-in-azure)
 			- [Modify session host image](#modify-session-host-image)
@@ -68,13 +69,41 @@
 		- [Performance tooling](#performance-tooling)
 	- [Security](#security)
 		- [Conditional Access](#conditional-access)
-		- [Plan and implement multifactor authentication (MFA) in Azure Virtual Desktop](#plan-and-implement-multifactor-authentication-mfa-in-azure-virtual-desktop)
-			- [Conditional Access](#conditional-access-1)
-				- [Requirements for an Conditional Access Policy requiring MFA when connection to AVD](#requirements-for-an-conditional-access-policy-requiring-mfa-when-connection-to-avd)
-				- [Steps for creating the Conditional Access Policy](#steps-for-creating-the-conditional-access-policy)
-			- [RBAC for Azure Virtual Desktop](#rbac-for-azure-virtual-desktop)
-			- [Microsoft Intune support](#microsoft-intune-support)
-			- [Screen capture protection](#screen-capture-protection)
+			- [Requirements for an Conditional Access Policy requiring MFA when connection to AVD](#requirements-for-an-conditional-access-policy-requiring-mfa-when-connection-to-avd)
+			- [Steps for creating the Conditional Access Policy](#steps-for-creating-the-conditional-access-policy)
+		- [RBAC for Azure Virtual Desktop](#rbac-for-azure-virtual-desktop)
+		- [Microsoft Intune support](#microsoft-intune-support)
+		- [Screen capture protection](#screen-capture-protection)
+	- [Application delivery](#application-delivery)
+		- [MSIX App attach](#msix-app-attach)
+			- [How MSIX app attach works](#how-msix-app-attach-works)
+			- [Set up a file share for MSIX app attach](#set-up-a-file-share-for-msix-app-attach)
+				- [Recommendations and exclusions](#recommendations-and-exclusions)
+				- [RBAC and NTFS permissions](#rbac-and-ntfs-permissions)
+			- [Upload MSIX image to a (NetApp) file share](#upload-msix-image-to-a-netapp-file-share)
+			- [App specific info](#app-specific-info)
+				- [MS-Teams with media optimiazation](#ms-teams-with-media-optimiazation)
+			- [Publish built-in apps](#publish-built-in-apps)
+				- [Publish MS-Edge](#publish-ms-edge)
+			- [Troubleshoot application issues for Azure Virtual Desktop](#troubleshoot-application-issues-for-azure-virtual-desktop)
+	- [Optimization](#optimization)
+		- [Optimization principles](#optimization-principles)
+		- [Virtual Desktop Optimization Tool](#virtual-desktop-optimization-tool)
+		- [Updates](#updates)
+		- [Persistent virtual desktop environments](#persistent-virtual-desktop-environments)
+		- [Non-persistent virtual desktop environments](#non-persistent-virtual-desktop-environments)
+		- [Universal Print](#universal-print)
+		- [Start VM On Connect](#start-vm-on-connect)
+			- [Configuration](#configuration-1)
+	- [Availability and Disaster Recovery](#availability-and-disaster-recovery)
+		- [Virtual Machine replication](#virtual-machine-replication)
+		- [FSLogix config](#fslogix-config)
+			- [Azure Files](#azure-files-1)
+	- [Troubleshooting](#troubleshooting)
+		- [Client troubleshooting](#client-troubleshooting)
+			- [Remote Desktop client for Windows 10 stops responding or cannot be opened](#remote-desktop-client-for-windows-10-stops-responding-or-cannot-be-opened)
+			- [Web client won't open](#web-client-wont-open)
+			- [Web client keeps prompting for credentials.](#web-client-keeps-prompting-for-credentials)
 
 
 ## To check/do
@@ -286,6 +315,16 @@ Windows 11/10 Enterprise multi-session is available in the Azure Image Gallery. 
 
 - The first option is to provision a virtual machine in Azure (See: Create a virtual machine from a managed image).
 - The second option is to create the image locally by downloading the image, provisioning a Hyper-V virtual machine, and customizing it to suit your needs.
+
+### General imaging recommendations
+
+Here are some extra things you should keep in mind when creating a golden image:
+
+- Don't capture a VM that already exists in your host pools. The image will conflict with the existing VM's configuration, and the new VM won't work.
+- Make sure to remove the VM from the domain before running sysprep.
+- Delete the base VM once you've captured the image from it.
+- After you've captured your image, don't use the same VM you captured again. Instead, create a new base VM from the last snapshot you created. You'll need to periodically update and patch this new VM on a regular basis.
+- Don't create a new base VM from an existing custom image.
 
 #### Managed images
 
@@ -813,17 +852,13 @@ Use the  [Azure Virtual Desktop Experience Estimator](https://azure.microsoft.co
 
 ![Conditional Access Flow](Images/planning-conditional-access-1-060d60dd.png)
 
-### Plan and implement multifactor authentication (MFA) in Azure Virtual Desktop
-
-#### Conditional Access
-
-##### Requirements for an Conditional Access Policy requiring MFA when connection to AVD
+#### Requirements for an Conditional Access Policy requiring MFA when connection to AVD
 
 - Assign users a license that includes Azure Active Directory Premium P1 or P2.
 - An Azure Active Directory group with your users assigned as group members.
 - Enable multifactor authentication for all your users.
 
-##### Steps for creating the Conditional Access Policy
+#### Steps for creating the Conditional Access Policy
 
 1. Sign in to the Azure portal as a global administrator, security administrator, or Conditional Access administrator.
 2. Browse to Azure Active Directory > Security > Conditional Access.
@@ -846,7 +881,7 @@ Use the  [Azure Virtual Desktop Experience Estimator](https://azure.microsoft.co
 14. Confirm your settings and set Enable policy to On.
 15. Select Create to enable your policy.
 
-#### RBAC for Azure Virtual Desktop
+### RBAC for Azure Virtual Desktop
 
 Below are the Azure Virtual Desktop Roles:
 
@@ -867,7 +902,7 @@ There are three RBAC scopes within AVD:
 - App groups
 - Workspaces
 
-#### Microsoft Intune support
+### Microsoft Intune support
 
 Intune supports Azure Virtual Desktop VM's that are:
 
@@ -881,7 +916,7 @@ Intune supports Azure Virtual Desktop VM's that are:
 
 > Intune doesn't currently support management of Windows 10 Enterprise multi-session.
 
-#### Screen capture protection
+### Screen capture protection
 
 The following clients currently support screen capture protection:
 
@@ -889,3 +924,266 @@ The following clients currently support screen capture protection:
 - macOS client version 10.7.0 or later supports screen capture protection for both RemoteApp and full desktops.
 
 You can configure this using a GPO with Azure Virtual Desktop Administrative template
+
+## Application delivery
+
+You can deliver apps in Azure Virtual Desktop through one of the following methods:
+
+- Put apps in a master image.
+- Use tools like SCCM or Intune for central management.
+- - Dynamic app provisioning (AppV, VMware AppVolumes, or Citrix - AppLayering).
+- Create custom tools or scripts using Microsoft and a third-party tool.
+
+### MSIX App attach
+
+In an Azure Virtual Desktop deployment, MSIX app attach can:
+
+- Create separation between user data, the OS, and apps by using MSIX containers.
+- Remove the need for repackaging when delivering applications dynamically.
+- Reduce the time it takes for a user to sign in.
+- Reduce infrastructure requirements and cost.
+
+#### How MSIX app attach works
+
+MSIX app attach stores application files in a separate virtual hard disk from the operating system. It registers the regular MSIX package on a device instead of on a physical download and installation. The registration uses existing Windows APIs and has minimal impact on user sign-in times, which enhances the user experience.
+
+When you open MSIX app attach, the application files are accessed from a Virtual hard disk. (VHD). You're not even aware that the application isn't locally installed.
+
+![MSIX app attach](Images/app-attach-c71d9d6a.png)
+
+MSIX app attach follows several steps or actions:
+
+| **Term**             | **Definition**                                                                                                                                                                        |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Stage                | MSIX app attach notifies the operating system that an application is available, and that the virtual disk that contains the MSIX package (also known as the MSIX image) is available. |
+| Registration         | MSIX app attach uses a per-user process to make the application available to you.                                                                                                     |
+| Delayed registration | Complete registration of the application is delayed until you decide to run the application.                                                                                          |
+| Deregistration       | The application is no longer available to you after you sign out.                                                                                                                     |
+| Destage              | The application is no longer available from the virtual machine after shutdown or restart of the machine.                                                                             |
+
+After you open MSIX app attach, you experience the following process:
+
+1. From the Azure Virtual Desktop client, you sign in and select the host pool for which you have access. The process is similar to opening published RemoteApp programs from the Azure Virtual Desktop environment.
+2. You're assigned a virtual machine within the host pool, on which a RemoteApp or Remote Desktop session is created. The Azure Virtual Desktop client interacts with that session.
+3. If the user profile is configured, the FSLogix agent on the session host provides the user profile from the file share. The file share can be Azure Files, Azure NetApp Files, or an infrastructure as a service (IaaS) file server.
+4. Applications that are assigned to you are read from Azure Virtual Desktop.
+5. MSIX app attach applications are registered to the virtual machine for you, from the attached MSIX virtual disk. That virtual disk might be on an IaaS file share, Azure Files, or Azure NetApp Files.
+
+![How MSIX App attach works](Images/how-msix-app-attach-work-8b5ff719.png)
+
+| **Feature**          | **Traditional app layering**                                                           | **MSIX app attach**                                                                                                                                                                   |
+|----------------------|----------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Format               | Different-app layering technologies require different proprietary formats.             | Works with the native MSIX packaging format.                                                                                                                                          |
+| Repackaging overhead | Proprietary formats require sequencing and repackaging per update.                     | Apps published as MSIX don't require repackaging. However, if the MSIX package isn't available, repackaging overhead still applies.                                                   |
+| Ecosystem            | N/A (for example, vendors don't ship App-V)                                            | MSIX is Microsoft's mainstream technology that key ISV partners and in-house apps like Office are adopting. You can use MSIX on both virtual desktops and physical Windows computers. |
+| Infrastructure       | Additional infrastructure required (servers, clients, and so on)                       | Storage only                                                                                                                                                                          |
+| Administration       | Requires maintenance and update                                                        | Simplifies app updates                                                                                                                                                                |
+| User experience      | Impacts user sign-in time. Boundary exists between OS state, app state, and user data. | Delivered apps are indistinguishable from locally installed applications.                                                                                                             |
+#### Set up a file share for MSIX app attach
+
+##### Recommendations and exclusions
+
+- The storage solution you use for MSIX app attach should be in the same datacenter location as the session hosts.
+- To avoid performance bottlenecks, exclude the following VHD, VHDX, and CIM files from antivirus scans:
+  - <MSIXAppAttachFileShare\>\*.VHD
+  - <MSIXAppAttachFileShare\>\*.VHDX
+  - `\\storageaccount.file.core.windows.net\share*.VHD`
+  - `\\storageaccount.file.core.windows.net\share*.VHDX`
+  - <MSIXAppAttachFileShare>.CIM
+  - `\\storageaccount.file.core.windows.net\share**.CIM`
+- All VM system accounts and user accounts must have read-only permissions to access the file share.
+- Any disaster recovery plans for Azure Virtual Desktop must include replicating the MSIX app attach file share in your secondary failover location.
+
+##### RBAC and NTFS permissions
+
+| **Azure object**                   | **Required role**                                | **Role function**                             |
+|------------------------------------|--------------------------------------------------|-----------------------------------------------|
+| Session host (VM computer objects) | Storage File Data SMB Share Contributor          | Read and Execute, Read, List folder contents. |
+| Admins on File Share               | Storage File Data SMB Share Elevated Contributor | Full control.                                 |
+| Users on File Share                | Storage File Data SMB Share Contributor          | Read and Execute, Read, List folder contents. |
+
+#### Upload MSIX image to a (NetApp) file share
+
+1. In each session host, install the certificate that you signed the MSIX package with. Make sure to store the certificates in the folder named Trusted People.
+2. Copy the MSIX image you want to add to the Azure NetApps Files share.
+Go to File Explorer and enter the mount path, then paste the MSIX image into the mount path folder.
+3. Your MSIX image should now be accessible to your session hosts when they add an MSIX package using the Azure portal or PowerShell.
+
+#### App specific info
+
+##### MS-Teams with media optimiazation
+
+Prepare your image for Teams.
+To enable media optimization for Teams, set the following registry key on the host:
+
+From the start menu, run RegEdit as an administrator. Navigate to HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Teams. Create the Teams key if it doesn't already exist.
+Create the following value for the Teams key:
+
+| **Name**         | **Type** | **Data/Value** |
+|------------------|----------|----------------|
+| IsAVDEnvironment | DWORD    | 1              |
+
+Next, install the Teams WebSocket Service: [Remote Desktop WebRTC Redirector Service](https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RE4AQBt)
+
+Teams per machine installation
+
+```shell
+msiexec /i <path_to_msi> /l*v <install_logfile_name> ALLUSER=1
+```
+
+#### Publish built-in apps
+
+```powershell
+New-AzWvdApplication -Name <applicationname> -ResourceGroupName <resourcegroupname> -ApplicationGroupName <appgroupname> -FilePath "shell:appsFolder\<PackageFamilyName>!App" -CommandLineSetting <Allow|Require|DoNotAllow> -IconIndex 0 -IconPath <iconpath> -ShowInPortal:$true
+```
+
+##### Publish MS-Edge
+
+```powershell
+New-AzWvdApplication -Name -ResourceGroupName -ApplicationGroupName -FilePath "shell:Appsfolder\Microsoft.MicrosoftEdge_8wekyb3d8bbwe!MicrosoftEdge" -CommandLineSetting <Allow|Require|DoNotAllow> -iconPath "C:\Windows\SystemApps\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\microsoftedge.exe" -iconIndex 0 -ShowInPortal:$true
+```
+
+#### Troubleshoot application issues for Azure Virtual Desktop
+
+The User Input Delay counter can help you quickly identify the root cause for bad end-user RDP experiences. This counter measures how long any user input (such as mouse or keyboard usage) stays in the queue before it is picked up by a process, and the counter works in both local and remote sessions.
+
+![Input flow](Images/user-input-delay-image-1-ec61075c.png)
+
+The User Input Delay counter measures the max delta (within an interval of time) between the input being queued and when it's picked up by the app in a traditional message loop, as shown in the following flow chart:
+
+![User Input Delay](Images/user-input-delay-image-2-ed937a93.png)
+
+To use these new performance counters, you must first enable a registry key by running this command:
+
+```shell
+reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v "EnableLagCounter" /t REG_DWORD /d 0x1 /f
+```
+
+## Optimization
+
+### Optimization principles
+
+The optimization settings can be reviewed on a reference machine. A virtual machine (VM) would be an ideal place to build the VM, because state can be saved, checkpoints can be made, backups can be made, and so on. A default OS installation is performed to the base VM. That base VM is then optimized by removing unneeded apps, installing Windows updates, installing other updates, deleting temporary files, applying settings, and so on.
+
+### Virtual Desktop Optimization Tool
+
+The optimization scripts can be found at [https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool](https://github.com/The-Virtual-Desktop-Team/Virtual-Desktop-Optimization-Tool).
+
+### Updates
+
+Virtual desktop administrators control the process of updating through a process of shutting down VMs based on a "master" or "gold" image, unseal that image, which is read-only, patch the image, then reseal it and bring it back into production. Therefore, there is no need to have virtual desktop devices checking Windows Update.
+
+### Persistent virtual desktop environments
+
+Persistent virtual desktop saves the operating system state in between reboots. Other software layers of the virtual desktop solution provide the users easy and seamless access to their assigned VMs, often with a single sign-on solution.
+
+### Non-persistent virtual desktop environments
+
+When a non-persistent virtual desktop implementation is based on a base or "gold" image, the optimizations are mostly performed in the base image, and then through local settings and local policies.
+
+With image-based non-persistent (NP) virtual desktop environments, the base image is read-only. When an NP virtual desktop device (VM) is started, a copy of the base image is streamed to the VM. Activity that occurs during startup and thereafter until the next reboot is redirected to a temporary location. Usually the users are provided network locations to store their data. In some cases, the user’s profile is merged with the standard VM to provide the user their settings.
+
+More info: [Persistent and non-persistent VDI-environments | MS-Learn](https://learn.microsoft.com/en-us/training/modules/configure-user-experience-settings/3-configure-persistent-non-persistent-desktop-environments)
+
+### Universal Print
+
+Before you try to add a Universal Print printer to a user's device, ensure that:
+
+- The user's device is connected to internet.
+- The user's device is either:
+  - Azure AD joined
+  - Azure AD registered
+  - Hybrid Azure AD joined
+- The Universal Print printer has been shared.
+- The user has been added to the permissions of Universal Print printer that is to be added on the device.
+- The user has been assigned the license to use Universal Print.
+
+### Start VM On Connect
+
+- Start VM On Connect lets you reduce costs by enabling end users to turn on their session host virtual machines (VMs) only when they need them. You can them turn off VMs when they're not needed.
+- You can configure Start VM on Connect for personal or pooled host pools using the Azure portal or PowerShell. Start VM on Connect is a host pool setting.
+- For personal host pools, Start VM On Connect will only turn on an existing session host VM that has already been assigned or will be assigned to a user.
+- For pooled host pools, Start VM On Connect will only turn on a session host VM when none are turned on. More VMs will only be turned on when the first VM reaches the session limit.
+- You can only configure Start VM on Connect on existing host pools. You can't enable it at the same time you create a new host pool.
+
+#### Configuration
+
+- Before you can configure Start VM on Connect, you'll need to create a custom role-based access control (RBAC) role with your Azure subscription as the assignable scope.
+- Assigning a custom role at any level lower than your subscription, such as the resource group, host pool, or VM, will prevent Start VM on Connect from working properly. You'll need to add each Azure subscription as an assignable scope that contains host pools and session host VMs you want to use with Start VM on Connect.
+
+## Availability and Disaster Recovery
+
+To ensure your users are connected during an outage, you should consider the five components shown in the table below.
+
+| 1 | Virtual network          | Consider your network connectivity during an outage.                                                                                                    |
+|---|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 2 | Virtual machines         | Replicate the VMs in a secondary location or deploy multiple non-persistent host pools across Azure regions.                                            |
+| 3 | User and app data        | Using FSLogix profile containers, set up data replication in the secondary location. Data replication is also required for those using MSIX app attach. |
+| 4 | User identities          | Ensure user identities you set up in the primary location are available in the secondary location.                                                      |
+| 5 | Application dependencies | Ensure any line-of-business applications relying on data in your primary location are failed over to the secondary location.                            |
+
+### Virtual Machine replication
+
+You'll need to replicate your VMs to the secondary location for Azure Virtual Desktop. Your options for doing so depend on how your VMs are configured:
+
+- You can configure all your VMs for both pooled and personal host pools with Azure Site Recovery. With this method, you'll only need to set up one host pool and its related app groups and workspaces.
+- You can create a new host pool in the failover region while keeping all resources in your failover location turned off.
+- You need to set up new app groups and workspaces in the failover region, then use an Azure Site Recovery plan to turn on host pools.
+- You can create a host pool that's populated by VMs built in both the primary and failover regions while keeping the VMs in the failover region turned off.
+- You only need to set up one host pool and its related app groups and workspaces.
+- You can use an Azure Site Recovery plan to power on host pools with this method.
+
+Set up Azure Site Recovery by replicating an Azure VM to a different Azure region directly from the Azure portal. Site Recovery is automatically updated with new Azure features as they’re release
+
+![Azure Site Recovery with AVD](Images/azure-virtual-desktop-site-recovery-1-71f7b63a.png)
+
+### FSLogix config
+
+The FSLogix agent can support multiple profile locations if you configure the registry entries for FSLogix.
+
+To configure the registry entries:
+
+1. Open the Registry Editor.
+2. Go to Computer > HKEY_LOCAL_MACHINE > SOFTWARE > FSLogix > Profiles.
+3. Right-click on VHDLocations and select Edit Multi-String.
+4. In the Value Data field, enter the locations you want to use.
+5. When you're done, select OK.
+
+If the first location is unavailable, the FSLogix agent will automatically fail over to the second, and so on.
+
+It's recommended you configure the FSLogix agent with a path to the secondary location in the main region. Once the primary location shuts down, the FLogix agent will replicate as part of the VM Azure Site Recovery replication. Once the replicated VMs are ready, the agent will automatically attempt to path to the secondary region.
+
+#### Azure Files
+Azure Files supports cross-region asynchronous replication that you can specify when you create the storage account. If the asynchronous nature of Azure Files already covers your disaster recovery goals, then you don't need to do additional configuration.
+
+If you need synchronous replication to minimize data loss, then we recommend you use FSLogix Cloud Cache instead.
+
+## Troubleshooting
+
+### Client troubleshooting
+
+#### Remote Desktop client for Windows 10 stops responding or cannot be opened
+
+You can reset the user data from the About page or using a command.
+Use the following command to remove your user data, restore default settings and unsubscribe from all Workspaces.
+
+```shell
+msrdcw.exe /reset [/f]
+```
+
+#### Web client won't open
+
+- Test internet connection first
+- Next, check name resolving
+  - `nslookup rdweb.wvd.microsoft.com`
+  - `Resolve-DNSName rdweb.wvd.microsoft.com`
+
+#### Web client keeps prompting for credentials.
+
+If the Web client keeps prompting for credentials, follow these instructions:
+
+- Confirm the web client URL is correct.
+- Confirm that the credentials you're using are for the Azure Virtual Desktop environment tied to the URL.
+- Clear browser cookies.
+- Clear browser cache.
+- Open your browser in Private mode.
