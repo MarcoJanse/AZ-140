@@ -67,6 +67,8 @@
 		- [Host sizing](#host-sizing)
 		- [Network](#network)
 		- [Performance tooling](#performance-tooling)
+		- [Scaling](#scaling)
+			- [How the scaling tool works](#how-the-scaling-tool-works)
 	- [Security](#security)
 		- [Conditional Access](#conditional-access)
 			- [Requirements for an Conditional Access Policy requiring MFA when connection to AVD](#requirements-for-an-conditional-access-policy-requiring-mfa-when-connection-to-avd)
@@ -85,7 +87,6 @@
 				- [MS-Teams with media optimiazation](#ms-teams-with-media-optimiazation)
 			- [Publish built-in apps](#publish-built-in-apps)
 				- [Publish MS-Edge](#publish-ms-edge)
-			- [Troubleshoot application issues for Azure Virtual Desktop](#troubleshoot-application-issues-for-azure-virtual-desktop)
 	- [Optimization](#optimization)
 		- [Optimization principles](#optimization-principles)
 		- [Virtual Desktop Optimization Tool](#virtual-desktop-optimization-tool)
@@ -99,11 +100,15 @@
 		- [Virtual Machine replication](#virtual-machine-replication)
 		- [FSLogix config](#fslogix-config)
 			- [Azure Files](#azure-files-1)
+	- [Montoring](#montoring)
+		- [Open Azure Monitor for Azure Virtual Desktop](#open-azure-monitor-for-azure-virtual-desktop)
+		- [Log Analytics settings](#log-analytics-settings)
 	- [Troubleshooting](#troubleshooting)
 		- [Client troubleshooting](#client-troubleshooting)
 			- [Remote Desktop client for Windows 10 stops responding or cannot be opened](#remote-desktop-client-for-windows-10-stops-responding-or-cannot-be-opened)
 			- [Web client won't open](#web-client-wont-open)
 			- [Web client keeps prompting for credentials.](#web-client-keeps-prompting-for-credentials)
+			- [Troubleshoot application issues for Azure Virtual Desktop](#troubleshoot-application-issues-for-azure-virtual-desktop)
 
 
 ## To check/do
@@ -846,6 +851,31 @@ Recommended bandwidth
 
 Use the  [Azure Virtual Desktop Experience Estimator](https://azure.microsoft.com/services/virtual-desktop/assessment/)  to determine the connection round-trip time (RTT) from your current location, through the Azure Virtual Desktop service, to the Azure region where you deploy virtual machines.
 
+### Scaling
+
+#### How the scaling tool works
+
+The scaling tool provides a low-cost automation option for customers who want to optimize their session host VM costs.
+
+You can use the scaling tool to:
+
+- Schedule VMs to start and stop based on Peak and Off-Peak business hours.
+- Scale out VMs based on number of sessions per CPU core.
+- Scale in VMs during Off-Peak hours, leaving the minimum number of session host VMs running.
+
+The scaling tool uses a combination of an Azure Automation account, a PowerShell runbook, a webhook, and the Azure Logic App to function. When the tool runs, Azure Logic App calls a webhook to start the Azure Automation runbook. The runbook then creates a job.
+
+During peak usage time, the job checks the current number of sessions and the VM capacity of the current running session host for each host pool. It uses this information to calculate if the running session host VMs can support existing sessions based on the SessionThresholdPerCPU parameter defined for the CreateOrUpdateAzLogicApp.ps1 file.
+
+- If the session host VMs can't support existing sessions, the job starts additional session host VMs in the host pool.
+
+During the off-peak usage time, the job determines how many session host VMs should be shut down based on the MinimumNumberOfRDSH parameter. If you set the LimitSecondsToForceLogOffUser parameter to a non-zero positive value, the job will set the session host VMs to drain mode to prevent new sessions from connecting to the hosts.
+
+- The job will notify any currently signed in users to save their work, wait the configured amount of time, and then force the users to sign out.
+- Once all user sessions on the session host VM have been signed out, the job will shut down the VM.
+- After the VM shuts down, the job will reset its session host drain mode.
+
+
 ## Security
 
 ### Conditional Access
@@ -1043,22 +1073,6 @@ New-AzWvdApplication -Name <applicationname> -ResourceGroupName <resourcegroupna
 New-AzWvdApplication -Name -ResourceGroupName -ApplicationGroupName -FilePath "shell:Appsfolder\Microsoft.MicrosoftEdge_8wekyb3d8bbwe!MicrosoftEdge" -CommandLineSetting <Allow|Require|DoNotAllow> -iconPath "C:\Windows\SystemApps\Microsoft.MicrosoftEdge_8wekyb3d8bbwe\microsoftedge.exe" -iconIndex 0 -ShowInPortal:$true
 ```
 
-#### Troubleshoot application issues for Azure Virtual Desktop
-
-The User Input Delay counter can help you quickly identify the root cause for bad end-user RDP experiences. This counter measures how long any user input (such as mouse or keyboard usage) stays in the queue before it is picked up by a process, and the counter works in both local and remote sessions.
-
-![Input flow](Images/user-input-delay-image-1-ec61075c.png)
-
-The User Input Delay counter measures the max delta (within an interval of time) between the input being queued and when it's picked up by the app in a traditional message loop, as shown in the following flow chart:
-
-![User Input Delay](Images/user-input-delay-image-2-ed937a93.png)
-
-To use these new performance counters, you must first enable a registry key by running this command:
-
-```shell
-reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v "EnableLagCounter" /t REG_DWORD /d 0x1 /f
-```
-
 ## Optimization
 
 ### Optimization principles
@@ -1158,6 +1172,27 @@ Azure Files supports cross-region asynchronous replication that you can specify 
 
 If you need synchronous replication to minimize data loss, then we recommend you use FSLogix Cloud Cache instead.
 
+## Montoring
+
+Before you start using Azure Monitor for Azure Virtual Desktop, you'll need to set up the following things:
+
+- At least one configured Log Analytics Workspace. Use a designated Log Analytics workspace for your Azure Virtual Desktop session hosts to ensure that performance counters and events are only collected from session hosts in your Azure Virtual Desktop deployment.
+- Enable data collection for the following things in your Log Analytics workspace:
+  - Diagnostics from your Azure Virtual Desktop environment
+  - Recommended performance counters from your Azure Virtual Desktop session hosts
+  - Recommended Windows Event Logs from your Azure Virtual Desktop session hosts
+
+### Open Azure Monitor for Azure Virtual Desktop
+
+You can open Azure Monitor for Azure Virtual Desktop by doing the following:
+
+Go to the Azure portal.
+Search for and select Azure Monitor from the Azure portal. Select Insights Hub under Insights, then select Azure Virtual Desktop. Once you have the page open, enter the Subscription, Resource group, Host pool, and Time range of the environment you want to monitor.
+
+### Log Analytics settings
+
+To start using Azure Monitor for Azure Virtual Desktop, you'll need at least one Log Analytics workspace. **Use a designated Log Analytics workspace for your Azure Virtual Desktop session hosts** to ensure that performance counters and events are only collected from session hosts in your Azure Virtual Desktop deployment.
+
 ## Troubleshooting
 
 ### Client troubleshooting
@@ -1187,3 +1222,19 @@ If the Web client keeps prompting for credentials, follow these instructions:
 - Clear browser cookies.
 - Clear browser cache.
 - Open your browser in Private mode.
+
+#### Troubleshoot application issues for Azure Virtual Desktop
+
+The User Input Delay counter can help you quickly identify the root cause for bad end-user RDP experiences. This counter measures how long any user input (such as mouse or keyboard usage) stays in the queue before it is picked up by a process, and the counter works in both local and remote sessions.
+
+![Input flow](Images/user-input-delay-image-1-ec61075c.png)
+
+The User Input Delay counter measures the max delta (within an interval of time) between the input being queued and when it's picked up by the app in a traditional message loop, as shown in the following flow chart:
+
+![User Input Delay](Images/user-input-delay-image-2-ed937a93.png)
+
+To use these new performance counters, you must first enable a registry key by running this command:
+
+```shell
+reg add "HKLM\System\CurrentControlSet\Control\Terminal Server" /v "EnableLagCounter" /t REG_DWORD /d 0x1 /f
+```
