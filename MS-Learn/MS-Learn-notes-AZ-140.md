@@ -177,7 +177,7 @@ Azure Virtual Desktop session hosts: A host pool can run the following operating
 
 Azure Virtual Desktop doesn't support the RemoteApp and Desktop Connections (RADC) client or the Remote Desktop Connection (MSTSC) client.
 
-You can access Azure Virtual Desktop resources on devices with Windows 10, Windows 10 IoT Enterprise, and Windows 7 using the Windows Desktop client. ::windows 11?::
+You can access Azure Virtual Desktop resources on devices with Windows 11, Windows 10, Windows 10 IoT Enterprise, and Windows 7 using the Windows Desktop client.
 The client doesn't support Window 8 or Windows 8.1.
 
 ### Host pools
@@ -254,11 +254,11 @@ The following load-balancing methods are available in Azure Virtual Desktop:
 There are several options for updating Azure Virtual Desktop desktops. Deploying an updated image every month guarantees compliance and state.
 
 	 
-	* [Microsoft Endpoint Configuration Manager (MECM)](https://learn.microsoft.com/en-us/mem/configmgr/)  updates server and desktop operating systems.
-	* [Windows Updates for Business](https://learn.microsoft.com/en-us/windows/deployment/update/waas-manage-updates-wufb)  updates desktop operating systems like Windows 10 multi-session.
-	* [Azure Update Management](https://learn.microsoft.com/en-us/azure/automation/update-management/overview)  updates server operating systems.
-	* [Azure Log Analytics](https://learn.microsoft.com/en-us/azure/azure-monitor/platform/log-analytics-agent)  checks compliance.
-	* Deploy a new (custom) image to session hosts every month for the latest Windows and applications updates. You can use an image from the Azure Marketplace or a  [custom Azure managed image](https://learn.microsoft.com/en-us/azure/virtual-machines/windows/capture-image-resource) .
+- [Microsoft Endpoint Configuration Manager (MECM)](https://learn.microsoft.com/en-us/mem/configmgr/)  updates server and desktop operating systems.
+- [Windows Updates for Business](https://learn.microsoft.com/en-us/windows/deployment/update/waas-manage-updates-wufb)  updates desktop operating systems like Windows 10 multi-session.
+- [Azure Update Management](https://learn.microsoft.com/en-us/azure/automation/update-management/overview)  updates server operating systems.
+- [Azure Log Analytics](https://learn.microsoft.com/en-us/azure/azure-monitor/platform/log-analytics-agent)  checks compliance.
+- Deploy a new (custom) image to session hosts every month for the latest Windows and applications updates. You can use an image from the Azure Marketplace or a  [custom Azure managed image](https://learn.microsoft.com/en-us/azure/virtual-machines/windows/capture-image-resource) .
 
 ### Limits
 
@@ -307,10 +307,8 @@ Do the following to prepare your virtual machines before you can install the Azu
 To register the Azure Virtual Desktop agents, do the following on each virtual machine:
 
 - Connect to the virtual machine with the credentials you provided when creating the virtual machine.
-- Download and install the Azure Virtual Desktop Agent.
 - Download the [Azure Virtual Desktop Agent](https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RWrmXv).
-- Run the installer. When the installer asks you for the registration token, enter the value you got from the Get-AzWvdRegistrationInfo cmdlet.
-- Download and install the Azure Virtual Desktop Agent Bootloader.
+- Run the installer. When the installer asks you for the registration token, enter the value you got from the `Get-AzWvdRegistrationInfo` cmdlet.
 - Download the [Azure Virtual Desktop Agent Bootloader](https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RWrxrH).
 - Run the installer.
 
@@ -454,13 +452,15 @@ Azure Image Builder supports three distribution targets:
 - sharedImage - Azure Compute Gallery.
 - VHD - VHD in a storage account.
 
+More information about Image Builder: [Azure VM Image Builder overview](https://learn.microsoft.com/en-us/azure/virtual-machines/image-builder-overview?tabs=azure-powershell)
+
 ##### Recommendations for creating Windows images
 
 - **VM size**: For Windows, use Standard_D2_v2 or greater. The default size is Standard_D1_v2, which isn't suitable for Windows.
 - **Comment your code**: The VM Image Builder log, customization.log, is verbose. If you comment your scripts by using 'write-host', they'll be sent to the logs, which should make troubleshooting easier.
 - **Exit codes**: VM Image Builder expects all scripts to return a 0 exit code. If you use a non-zero exit code, VM Image Builder fails the customization and stops the build. If you have complex scripts, add instrumentation and emit exit codes, which will be shown in the customization.log file.
-- Test and retest your code on a standalone VM. Ensure that there are no user prompts, that you're using the correct privileges, and so on.
-- Networking: Set-NetAdapterAdvancedProperty is set in the optimization script but fails the VM Image Builder build. Because it disconnects the network, it's commented out.
+- **Test and retest your code on a standalone VM**. Ensure that there are no user prompts, that you're using the correct privileges, and so on.
+- **Networking:** Set-NetAdapterAdvancedProperty is set in the optimization script but fails the VM Image Builder build. Because it disconnects the network, it's commented out.
 
 ##### Install Microsoft 365 Apps on a master Virtual Hard Disk image
 
@@ -576,7 +576,7 @@ See https://learn.microsoft.com/en-us/training/modules/design-user-identities-pr
 |------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------------------|
 | Access                             | Cloud, on-premises and hybrid (Azure file sync)                    | Cloud, on-premises (via ExpressRoute)                              | Cloud, on-premises                                                             |
 | Backup                             | Azure backup snapshot integration                                  | Azure NetApp Files snapshots                                       | Azure backup snapshot integration                                              |
-| Security and compliance            | All Azure supported certificates                                   | ISO completed                                                      | All Azure supported certificates                                               |
+| Security and compliance            | All Azure supported certificates                                   | ISO compliant                                                      | All Azure supported certificates                                               |
 | Azure Active Directory integration | Native Active Directory and Azure Active Directory Domain Services | Azure Active Directory Domain Services and Native Active Directory | Native Active Directory or Azure Active Directory Domain Services support only |
 
 ### Azure Files tiers
