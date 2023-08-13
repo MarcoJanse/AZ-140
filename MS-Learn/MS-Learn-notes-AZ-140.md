@@ -13,6 +13,9 @@
 		- [Supported Operating Systems](#supported-operating-systems)
 		- [Client operating systems](#client-operating-systems)
 		- [Host pools](#host-pools)
+			- [Pooled Host pool](#pooled-host-pool)
+			- [Personal host pool](#personal-host-pool)
+			- [Host pool creation and management](#host-pool-creation-and-management)
 			- [Configure host pool assignment type (personal desktop host pools)](#configure-host-pool-assignment-type-personal-desktop-host-pools)
 		- [Load balancing](#load-balancing)
 		- [Update Management](#update-management)
@@ -59,7 +62,7 @@
 			- [Supported authentication scenarios](#supported-authentication-scenarios)
 			- [Restrictions](#restrictions)
 	- [Networking](#networking)
-		- [RDP shortpath](#rdp-shortpath)
+		- [RDP Shortpath](#rdp-shortpath)
 		- [QoS](#qos)
 			- [Quality of Service implementation checklist](#quality-of-service-implementation-checklist)
 	- [Performance](#performance)
@@ -112,6 +115,7 @@
 
 
 ## To check/do
+
 - [ ] Configuration limits
 - [ ] Azure Files vs NetApp files
 - [ ] Authentication and device registration
@@ -119,6 +123,7 @@
 - [ ] MSIX App attach
 
 ## Authentication
+
 AD DS: Azure Virtual Desktop VMs must domain-join an AD DS service, and the AD DS must be in sync with Azure AD to associate users between the two services. You can use Azure AD Connect to associate AD DS with Azure AD.
 
 ### Domain join options
@@ -137,12 +142,10 @@ The configurations listed below are supported with Azure AD-joined virtual machi
 
 Access to your on-premises or Active Directory domain-joined resources and should be considered when deciding whether Azure AD-joined virtual machines suits your environment. Microsoft recommends Azure AD-joined virtual machines for scenarios where users only need access to cloud-based resources or Azure AD-based authentication.
 
-- Azure Virtual Desktop (classic) doesn't support Azure AD-joined virtual machines.
-- Azure AD-joined virtual machines don't currently support external users.
-- Azure AD-joined virtual machines only supports local user profiles at this time.
-- Azure AD-joined virtual machines can't access Azure Files file shares for FSLogix or MSIX app attach. You'll need Kerberos authentication to access either of these features.
-- The Windows Store client doesn't currently support Azure AD-joined virtual machines.
-- Azure Virtual Desktop doesn't currently support single sign-on for Azure AD-joined virtual machines.
+- Azure Virtual Desktop (classic) doesn't support Azure AD-joined VMs.
+- Azure AD-joined VMs don't currently support external identities, such as Azure AD Business-to-Business (B2B) and Azure AD Business-to-Consumer (B2C).
+- Azure AD-joined VMs can only access Azure Files shares for hybrid users using Azure AD Kerberos for FSLogix user profiles.
+- The Remote Desktop app for Windows doesn't support Azure AD-joined VMs.
 
 ##### Assign users to host pools
 
@@ -167,11 +170,11 @@ You can enable multifactor authentication for Azure AD-joined virtual machines b
 
 Azure Virtual Desktop session hosts: A host pool can run the following operating systems:
 
-	* Windows 7 Enterprise
-	* Windows 10 Enterprise
-	* Windows 10 Enterprise Multi-session
-	* Windows Server 2012 R2 and above
-	* Custom Windows system images with pre-loaded apps, group policies, or other customizations
+- Windows 7 Enterprise
+- Windows 10 Enterprise
+- Windows 10 Enterprise Multi-session
+- Windows Server 2012 R2 and above
+- Custom Windows system images with pre-loaded apps, group policies, or other customizations
 
 ### Client operating systems
 
@@ -182,14 +185,18 @@ The client doesn't support Window 8 or Windows 8.1.
 
 ### Host pools
 
-* Pooled host pool
-	* Recommended windows 10 multisession
-	* No admin rights / unable to add applications 
-	* Load balances users to available session host
-	
-* Personal host pool
-	* Usually admin rights 
-	* *Always the same session host exclusive to the user 
+#### Pooled Host pool
+
+- Recommended windows 10 multisession
+- No admin rights / unable to add applications
+- Load balances users to available session host
+
+#### Personal host pool
+
+- Usually admin rights
+- Always the same session host exclusive to the user
+
+#### Host pool creation and management
 
 To create a host pool, workspace and desktop app group, you could use the following PowerShell code:
 
@@ -245,15 +252,14 @@ Update-AzWvdSessionHost -HostPoolName <hostpoolname> -Name <sessionhostname> -Re
 ### Load balancing
 
 The following load-balancing methods are available in Azure Virtual Desktop:
-		
-* Breadth-first load balancing allows you to evenly distribute user sessions across the session hosts in a host pool.
-* Depth-first load balancing allows you to saturate a session host with user sessions in a host pool. Once the first session reaches its session limit threshold, the load balancer directs any new user connections to the next session host in the host pool until it reaches its limit, and so on.
+  
+- Breadth-first load balancing allows you to evenly distribute user sessions across the session hosts in a host pool.
+- Depth-first load balancing allows you to saturate a session host with user sessions in a host pool. Once the first session reaches its session limit threshold, the load balancer directs any new user connections to the next session host in the host pool until it reaches its limit, and so on.
 
 ### Update Management
 
 There are several options for updating Azure Virtual Desktop desktops. Deploying an updated image every month guarantees compliance and state.
 
-	 
 - [Microsoft Endpoint Configuration Manager (MECM)](https://learn.microsoft.com/en-us/mem/configmgr/)  updates server and desktop operating systems.
 - [Windows Updates for Business](https://learn.microsoft.com/en-us/windows/deployment/update/waas-manage-updates-wufb)  updates desktop operating systems like Windows 10 multi-session.
 - [Azure Update Management](https://learn.microsoft.com/en-us/azure/automation/update-management/overview)  updates server operating systems.
@@ -264,8 +270,8 @@ There are several options for updating Azure Virtual Desktop desktops. Deploying
 
 Limits to take into consideration
 
-* Azure virtual machine session host name prefixes can't exceed 11 characters, due to auto-assigning of instance names and the NetBIOS limit of 15 characters per computer account.
-* You can currently deploy 399 VMs per Azure Virtual Desktop Azure Resource Manager template deployment without Availability Sets, or 200 virtual machines per Availability Set. You can increase the number of VMs per deployment by switching off Availability Sets in either the Azure Resource Manager template or the Azure portal host pool enrollment.
+- Azure virtual machine session host name prefixes can't exceed 11 characters, due to auto-assigning of instance names and the NetBIOS limit of 15 characters per computer account.
+- You can currently deploy 399 VMs per Azure Virtual Desktop Azure Resource Manager template deployment without Availability Sets, or 200 virtual machines per Availability Set. You can increase the number of VMs per deployment by switching off Availability Sets in either the Azure Resource Manager template or the Azure portal host pool enrollment.
 
 ### Default RDP file properties
 
@@ -555,7 +561,7 @@ Set-WinUserLanguageList $LanguageList -force
 ## Storage
 Azure files recommended for most customers. Other options are Azure NetApp files and Storage Spaces Direct.
 
-See https://learn.microsoft.com/en-us/training/modules/design-user-identities-profiles/4-recommend-appropriate-storage-solution
+See [Recommend an appropriate storage solution](https://learn.microsoft.com/en-us/training/modules/design-user-identities-profiles/4-recommend-appropriate-storage-solution)
 
 ### Storage solutions for Azure Virtual Desktop
 
@@ -602,6 +608,7 @@ Some things to know about Office Profile Containers:
 - Adding a user to the `FSLogix ODFC Exclude` List group means that the FSLogix agent won't attach a FSLogix office container for the user. In the case where a user is a member of both the exclude and include groups, exclude takes priority.
 
 #### Using Profile Container and Office Container together
+
 There are several reasons why Profile Container and Office Container may be used together. The most common reasons are:
 
 - Discretion is wanted in the storage location for Office Data vs. other profile data.
@@ -651,10 +658,11 @@ Things you can do with the Apps Rules Editor:
 By default, Rules and Rule Sets are accessed from C:\Program Files\FSLogix\Apps\Rules.
 
 File types:
+
 - rule files (.fxr) 
 - assignment files (.fxa)
 
-FSlogix supports four rule types:
+FSLogix supports four rule types:
 
 - **Hiding Rule** - hides the specified items using specified criteria.
 - **Redirect Rule** - causes the specified item to be redirected as defined.
@@ -686,6 +694,7 @@ The Application Masking Rule Editor is used to define rules used by [Application
 - Exclude the VHD(X) files for Profile Containers from Anti Virus (AV) scanning.
 
 ##### Configure Profile Container Registry settings
+
 The configuration of Profile Container is accomplished through registry settings and user groups. Registry settings may be managed manually, with GPOs, or using alternate preferred methods. Configuration settings for Profile Container are set in HKLM\SOFTWARE\FSLogix\Profiles.
 
 Below are settings required to enable Profile Container and to specify the location for the profile VHD to be stored. The minimum required settings to enable Profile Containers are:
@@ -707,6 +716,7 @@ VHDLocations may be replaced by CCDLocations when using Cloud Cache.
 | PreventLoginWithTempProfile          | DWORD    | 0                    | If set to 1 Profile Container will load FRXShell if it's determined a temp profile has been created. The user will receive the FRXShell prompt - default prompt to call support, and the users only option will be to sign out.                                                                                                                                 |
 
 ##### Set up Include and Exclude User Groups
+
 There are often users, such as local administrators, that have profiles that should remain local. During installation, four user groups are created to manage users who's profiles are included and excluded from Profile Container and Office Container redirection.
 
 - By default Everyone is added to the `FSLogix Profile Include` List group.
@@ -757,17 +767,17 @@ Azure Files supports identity-based authentication for Windows file shares over 
 
 ## Networking
 
-### RDP shortpath
+### RDP Shortpath
 
 Remote Desktop Protocol (RDP) Shortpath for managed networks is a feature of Azure Virtual Desktop that establishes a direct UDP-based transport between Remote Desktop Client and Session host. RDP uses this transport to deliver Remote Desktop and RemoteApp while offering better reliability and consistent latency.
 
 The Azure Virtual Desktop client needs a direct line of sight to the session host. You can get a direct line of sight by using one of these methods:
-	
-* Make sure the remote client machines are running Windows 11, Windows 10, or Windows 7 and have the  [Windows Desktop client](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/windowsdesktop)  installed. Currently, non-Windows clients aren't supported.
-* Use  [ExpressRoute private peering](https://learn.microsoft.com/en-us/azure/expressroute/expressroute-circuit-peerings) .
-* Use a  [Site-to-Site virtual private network (VPN) (IPsec-based)](https://learn.microsoft.com/en-us/azure/vpn-gateway/tutorial-site-to-site-portal) 
-* Use a  [Point-to-Site VPN (IPsec-based)](https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-point-to-site-resource-manager-portal) 
-* Use a  [public IP address assignment](https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/virtual-network-public-ip-address) .
+
+- Make sure the remote client machines are running Windows 11, Windows 10, or Windows 7 and have the  [Windows Desktop client](https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/clients/windowsdesktop)  installed. Currently, non-Windows clients aren't supported.
+- Use  [ExpressRoute private peering](https://learn.microsoft.com/en-us/azure/expressroute/expressroute-circuit-peerings) .
+- Use a  [Site-to-Site virtual private network (VPN) (IPsec-based)](https://learn.microsoft.com/en-us/azure/vpn-gateway/tutorial-site-to-site-portal) 
+- Use a  [Point-to-Site VPN (IPsec-based)](https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-howto-point-to-site-resource-manager-portal) 
+- Use a  [public IP address assignment](https://learn.microsoft.com/en-us/azure/virtual-network/ip-services/virtual-network-public-ip-address) .
 
 To enable RDP Shortpath for managed networks, you need to enable the RDP Shortpath listener on the session host. You can enable RDP Shortpath on any number of session hosts used in your environment. However, there's no requirement to enable RDP Shortpath on all hosts in your host pool.
 
@@ -786,6 +796,7 @@ To allow inbound network traffic for RDP Shortpath, use the Microsoft Defender F
 ### QoS
 
 #### Quality of Service implementation checklist
+
 At a high level, do the steps listed to implement QoS:
 
 1. Make sure your network is ready.
@@ -794,14 +805,13 @@ At a high level, do the steps listed to implement QoS:
 
 As you prepare to implement QoS, keep the guidelines listed below in mind:
 
-* The shortest path to session host is best.
-* Any obstacles in between, such as proxies or packet inspection devices, aren't recommended.
+- The shortest path to session host is best.
+- Any obstacles in between, such as proxies or packet inspection devices, aren't recommended.
 
 Insert DSCP markers
 You can compare DSCP markings to postage stamps that indicate to postal workers how urgent the delivery is and how best to sort it for speedy delivery. Once you've configured your network to give priority to RDP streams, lost packets and late packets should diminish significantly.
 
 We recommend using DSCP value 46 that maps to Expedited Forwarding (EF) DSCP class.
-
 
 ## Performance
 
@@ -824,28 +834,28 @@ https://learn.microsoft.com/en-us/windows-server/remote/remote-desktop-services/
 
 Recommended bandwidth
 
-* Light
-	* 1.5 Mbps
-* Medium
-	* 3 Mbps
-* Heavy
-	5 Mbps
-* Power
-	15 Mbps
+- Light
+  - 1.5 Mbps
+- Medium
+  - 3 Mbps
+- Heavy
+ 5 Mbps
+- Power
+ 15 Mbps
 
-Display resolution vs bandwidth 
+Display resolution vs bandwidth
 
 Typical display resolutions at 30 fps
 Recommended bandwidth
 
-* About 1024 × 768 px
-	* 1.5 Mbps
-* About 1280 × 720 px
-	3 Mbps
-* About 1920 × 1080 px
-	* 5 Mbps
-* About 3840 × 2160 px (4K)
-	* 15 Mbps
+- About 1024 × 768 px
+  - 1.5 Mbps
+- About 1280 × 720 px
+ 3 Mbps
+- About 1920 × 1080 px
+  - 5 Mbps
+- About 3840 × 2160 px (4K)
+  - 15 Mbps
 
 ### Performance tooling
 
@@ -875,7 +885,6 @@ During the off-peak usage time, the job determines how many session host VMs sho
 - Once all user sessions on the session host VM have been signed out, the job will shut down the VM.
 - After the VM shuts down, the job will reset its session host drain mode.
 
-
 ## Security
 
 ### Conditional Access
@@ -900,11 +909,9 @@ During the off-peak usage time, the job determines how many session host VMs sho
 8. Under Cloud apps or actions > Include, select Select apps.
 9. Select one of the following apps based on which version of Azure Virtual Desktop you're using. Choose Azure Virtual Desktop (App ID 9cdead84-a844-4324-93f2-b2e6bb768d07)
 10. Go to Conditions > Client apps, then select where you want to apply the policy to:
-
-- Select Browser if you want the policy to apply to the web client.
-- Select Mobile apps and desktop clients if you want to apply the policy to other clients.
-- Select both check boxes if you want to apply the policy to all clients.
-
+    1. Select Browser if you want the policy to apply to the web client.
+    2. Select Mobile apps and desktop clients if you want to apply the policy to other clients.
+    3. Select both check boxes if you want to apply the policy to all clients.
 11. Once you've selected your app, choose Select, and then select Done.
 12. Under Access controls > Grant, select Grant access, Require multifactor authentication, and then Select.
 13. Under Access controls > Session, select Sign-in frequency, set the value to the time you want between prompts, and then select Select. For example, setting the value to 1 and the unit to Hours, will require multifactor authentication if a connection is launched an hour after the last one.
@@ -961,7 +968,7 @@ You can deliver apps in Azure Virtual Desktop through one of the following metho
 
 - Put apps in a master image.
 - Use tools like SCCM or Intune for central management.
-- - Dynamic app provisioning (AppV, VMware AppVolumes, or Citrix - AppLayering).
+  - Dynamic app provisioning (AppV, VMware AppVolumes, or Citrix - AppLayering).
 - Create custom tools or scripts using Microsoft and a third-party tool.
 
 ### MSIX App attach
@@ -1168,6 +1175,7 @@ If the first location is unavailable, the FSLogix agent will automatically fail 
 It's recommended you configure the FSLogix agent with a path to the secondary location in the main region. Once the primary location shuts down, the FLogix agent will replicate as part of the VM Azure Site Recovery replication. Once the replicated VMs are ready, the agent will automatically attempt to path to the secondary region.
 
 #### Azure Files
+
 Azure Files supports cross-region asynchronous replication that you can specify when you create the storage account. If the asynchronous nature of Azure Files already covers your disaster recovery goals, then you don't need to do additional configuration.
 
 If you need synchronous replication to minimize data loss, then we recommend you use FSLogix Cloud Cache instead.
